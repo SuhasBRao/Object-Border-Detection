@@ -3,16 +3,21 @@ from rembg import remove
 import numpy as np
 import os
 
-def read_image(image_path):
-    image = cv2.imread(image_path)
+def read_image(image_path: str):
+    '''
+    The function reads an image from specified path and returns it.
+    '''
+    image = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
     return image
-
 
 def show_image(image, image_window = "Temp"):
     cv2.imshow(image_window, image)
 
-
 def select_roi(image):
+    '''
+    Selects an ROI from the input image and returns the
+    ROI along with top-left coordinates.
+    '''
     # Select ROI
     r = cv2.selectROI("Image", image)
     
@@ -22,65 +27,54 @@ def select_roi(image):
     # return the cropeed image
     return cropped_image, (r[0], r[1])
 
-
-def remove_bg(roi):
-    output_img = remove(roi)
-    cv2.imwrite('ROI_fg.jpg',output_img)
-
-def remove_bg_using_cmd(cmd):
+def remove_bg_using_rembg(src_path, dst_path):
+    '''
+    Removes the background using rembg library.
+    CLI command is executed to remove background.
+    '''
+    cmd = f"rembg i {src_path} {dst_path}"
     os.system(cmd)
-    pass
-
-def read_transparent_img(img_path):
-    src = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
-
-    bgr = src[:,:,:3] # Channels 0..2
-    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2BGRA)
-
-    bgr = cv2.cvtColor(gray, cv2.COLOR_BGRA2BGR)
-    alpha = src[:,:,3] # Channel 3
-    result = np.dstack([bgr, alpha])
-    return result
     
-
 def draw_outline(roi_fg):
+    '''
+    The function draws an outline on the given image.
+    The input image must only be the foreground part.
+    '''
     temp_image = roi_fg.copy()
-    # gray = cv2.cvtColor(temp_image, cv2.COLOR_BGRA2GRAY)
+    
     blur = cv2.GaussianBlur(temp_image, (29,29), 0)
-    # cv2.imwrite("blur.jpg", blur)
-    
-    _ , thresholded = cv2.threshold(blur, 250 , 50,cv2.THRESH_BINARY )
-    
-    # cv2.imwrite("thresh.jpg", thresholded)
-    edges = cv2.Canny(thresholded, 30, 60)
-    # cv2.imwrite("edge.jpg", edges)
-    
-    contours, hierarchy= cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
-    cv2.drawContours(temp_image, contours, -1, (0,255,0),9)
+    _ , thresholded = cv2.threshold(blur, 251 , 150,cv2.THRESH_BINARY )
+    # cv2.imwrite("thresh.jpg", thresholded)
     
-    # cv2.imwrite('ROI_fg.jpg',temp_image)
+    edges = cv2.Canny(thresholded, 10, 30)
+    # cv2.imwrite("edge.jpg", edges)
+    contours, hierarchy= cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    cv2.drawContours(temp_image, contours, -1, (0,255,0),15)
  
     return temp_image
 
-
-def place_outline_on_input_img(input_img, outline_fg, roi_coord):
+def place_outline_on_input_img(input_img, overlay, roi_coord):
+    '''
+    The function places the overlay on the input image. roi_coord is used
+    to place the overlay at particular position.
+    '''
     x,y = roi_coord
     
-    _outline = outline_fg.copy()
-    # input_img = cv2.cvtColor(input_img, cv2.COLOR_BGR2BGRA)
+    _overlay = overlay.copy()
     
-    h1, w1 = _outline.shape[:2]
+    h1, w1 = _overlay.shape[:2]
     
     roi = input_img[y: y+h1, x:x + w1]
     
-    gray = cv2.cvtColor(_outline, cv2.COLOR_BGRA2GRAY)
-    _, mask = cv2.threshold(gray, 25, 250, cv2.THRESH_BINARY_INV)
+    gray = cv2.cvtColor(_overlay, cv2.COLOR_BGRA2GRAY)
+    _, mask = cv2.threshold(gray, 10, 255, cv2.THRESH_BINARY_INV)
     
     
     img_bg = cv2.bitwise_and(roi, roi, mask = mask)
-   
-    dst = cv2.add(img_bg, _outline)
+    
+    dst = cv2.add(img_bg, _overlay)
 
     input_img[y: y+h1, x:x + w1] = dst
     
@@ -106,22 +100,21 @@ if __name__ == "__main__":
         cv2.putText(image, "Select ROI", (int(w*0.04), int(h*0.07)), 
                     cv2.FONT_HERSHEY_PLAIN, font_scale, (255,0,0), 5)
         
+        # roi image is saved so we can read it while removing the background
         roi, roi_coord = select_roi(image)
         cv2.imwrite("roi.jpg", roi)
         
-        # remove_bg(roi)
-        remove_bg_using_cmd("rembg i roi.jpg TEMP.jpg")
+        remove_bg_using_rembg("roi.jpg", "roi_fg.jpg")
         
-        # roi_fg = cv2.imread("ROI_fg.jpg")
-        trans = read_transparent_img("TEMP.jpg")
-        # show_image(trans)
+        roi_fg = read_image("roi_fg.jpg")
         
         # Draw outline on the roi_fg image
-        # outline_fg = draw_outline(roi_fg)
-        outline_fg = draw_outline(trans)
+        overlay = draw_outline(roi_fg)
+        cv2.imwrite("overlay.jpg", overlay)
         
+        place_outline_on_input_img(image, overlay, roi_coord)
+        cv2.imwrite("output.jpg", image)
         
-        place_outline_on_input_img(image, outline_fg, roi_coord)
         cv2.putText(image, "Press Q->Exit or C->Clear", (int(w*0.04), int(h*0.95)), 
                     cv2.FONT_HERSHEY_PLAIN, font_scale, (0,0,0), 5)
         
