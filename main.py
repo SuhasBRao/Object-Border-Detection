@@ -1,6 +1,5 @@
 import cv2
 from rembg import remove
-import numpy as np
 import os
 
 def read_image(image_path: str):
@@ -47,7 +46,7 @@ def draw_outline(roi_fg):
     _ , thresholded = cv2.threshold(blur, 251 , 150,cv2.THRESH_BINARY )
     # cv2.imwrite("thresh.jpg", thresholded)
     
-    edges = cv2.Canny(thresholded, 10, 30)
+    edges = cv2.Canny(thresholded, 30, 60)
     # cv2.imwrite("edge.jpg", edges)
     contours, hierarchy= cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -55,7 +54,7 @@ def draw_outline(roi_fg):
  
     return temp_image
 
-def place_outline_on_input_img(input_img, overlay, roi_coord):
+def place_overlay_on_input_img(input_img, overlay, roi_coord):
     '''
     The function places the overlay on the input image. roi_coord is used
     to place the overlay at particular position.
@@ -83,7 +82,7 @@ def place_outline_on_input_img(input_img, overlay, roi_coord):
 # Driver Code starts
 if __name__ == "__main__":
     # We'll create a main window where the original image
-    # is displayed
+    # will be displayed
     cv2.namedWindow("Image", cv2.WINDOW_NORMAL)
     cv2.resizeWindow("Image", 700, 400)
     
@@ -112,7 +111,7 @@ if __name__ == "__main__":
         overlay = draw_outline(roi_fg)
         cv2.imwrite("overlay.jpg", overlay)
         
-        place_outline_on_input_img(image, overlay, roi_coord)
+        place_overlay_on_input_img(image, overlay, roi_coord)
         cv2.imwrite("output.jpg", image)
         
         cv2.putText(image, "Press Q->Exit or C->Clear", (int(w*0.04), int(h*0.95)), 
@@ -131,7 +130,5 @@ if __name__ == "__main__":
             image = read_image(image_path)
             image = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
             show_image(image, "Image")
-            
-    
 
 # } Driver Code ends
